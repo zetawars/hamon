@@ -590,7 +590,9 @@ function focusLayout(center, others) {
 function renderGraph() {
   const nodes = [...tickets].map(([id, t]) => {
     const label = trunc(t.title, 24), disc = isDiscipline(t);
-    const w = Math.max(disc ? 150 : 120, Math.min(220, label.length * 7.2 + (disc ? 46 : 34)));
+    // Wide enough for the title and for the small "KEY · category · 57%" line above it.
+    const meta = `${t.key} · ${trunc(t.props?.category || t.type, 14)} · 100%`;
+    const w = Math.max(disc ? 150 : 120, Math.min(240, Math.max(label.length * 7.2, meta.length * 6.4) + (disc ? 46 : 34)));
     const p = pos.get(id);
     return { id, t, w, h: disc ? 62 : 54, r: w / 2, ...(p ? { x: p.x, y: p.y } : {}) };
   });

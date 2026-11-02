@@ -1,0 +1,8 @@
+name: Ember Outpost
+description: "Sample project: a small sci-fi base builder whose models, sounds and scripts are made with AI tools."
+board:
+  columns:
+    status:
+      - To do
+      - In progress
+      - Done

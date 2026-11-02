@@ -12,6 +12,7 @@ This repo holds the tool only. Project data lives in project folders outside the
 - `electron/`: the desktop wrapper. `main.js` starts `src/server.js` on a free port and loads it in a window; `preload.js` adds native folder dialogs (`window.tgNative`). Keep app logic out of `electron/`, so the web version stays the real one.
 - `mcp/server.mjs`: MCP tools over `src/store.js`.
 - `src/migrate.js`, `src/db.js`: one-time move from the old SQLite version. `better-sqlite3` is an optional dependency used only there.
+- `examples/ember-outpost`: the sample project used by the README. `scripts/example-project.js` (`npm run docs:example`) rebuilds it, and `scripts/screenshots.js` (`npm run docs:screenshots`) recaptures `docs/images/` from it without writing anything. Re-run both when the UI or format changes.
 - `test/mcp-test.mjs` (`npm test`): MCP end to end in a throwaway folder. `test/smoke.js`: desktop screenshots, run with `TG_HOME=.smoke/home TG_PROJECTS=<folder of test projects> TG_SMOKE=.smoke npx electron .`. Always point tests at copies, never at real project folders.
 
 ## Data format (summary)

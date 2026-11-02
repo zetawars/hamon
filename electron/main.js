@@ -1,6 +1,6 @@
 // Desktop wrapper: starts the same web server the browser version uses (on a free port) and shows it in a window.
 // The only desktop-specific feature is native folder dialogs (see preload.js).
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } = require("electron");
 const path = require("node:path");
 const { startServer } = require("../src/server");
 
@@ -19,9 +19,11 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
   win.webContents.on("will-navigate", (e, url) => { if (!url.startsWith(server.url)) { e.preventDefault(); shell.openExternal(url); } });
   if (process.env.TG_SMOKE) require("../test/smoke").run(win);
+  if (process.env.TG_SCREENSHOTS) require("../scripts/screenshots").run(win);
 }
 
 app.whenReady().then(async () => {
+  if (process.env.TG_THEME) nativeTheme.themeSource = process.env.TG_THEME;   // "light" / "dark", for screenshots
   server = await startServer({
     home: process.env.TG_HOME || app.getPath("userData"),
     projectsRoot: process.env.TG_HOME ? path.join(process.env.TG_HOME, "Projects") : path.join(app.getPath("documents"), "Ticket Graph"),
