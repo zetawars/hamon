@@ -1,7 +1,7 @@
 {
   "name": "ticket-graph",
   "productName": "Ticket Graph",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Project tracker where every ticket and every link is a markdown file. Web app first, desktop app (Electron) second, plus an MCP server for Claude.",
   "main": "electron/main.js",
   "private": true,
