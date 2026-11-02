@@ -1,0 +1,52 @@
+{
+  "name": "ticket-graph",
+  "productName": "Ticket Graph",
+  "version": "1.0.0",
+  "description": "Project tracker where every ticket and every link is a markdown file. Web app first, desktop app (Electron) second, plus an MCP server for Claude.",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "web": "node src/server.js",
+    "start": "electron .",
+    "mcp": "node mcp/server.mjs",
+    "test": "node test/mcp-test.mjs",
+    "dist": "electron-builder --win nsis",
+    "postinstall": "electron-builder install-app-deps || node -e \"\""
+  },
+  "build": {
+    "appId": "local.ticketgraph",
+    "productName": "Ticket Graph",
+    "files": [
+      "src/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  },
+  "dependencies": {
+    "@fontsource/familjen-grotesk": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "d3": "7.9.0",
+    "yaml": "2.9.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "13.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

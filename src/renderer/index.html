@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; script-src 'self'">
+<title>Ticket Graph</title>
+<link rel="stylesheet" href="vendor/fonts/familjen-grotesk/500.css">
+<link rel="stylesheet" href="vendor/fonts/familjen-grotesk/700.css">
+<link rel="stylesheet" href="vendor/fonts/ibm-plex-sans/400.css">
+<link rel="stylesheet" href="vendor/fonts/ibm-plex-sans/500.css">
+<link rel="stylesheet" href="vendor/fonts/ibm-plex-sans/600.css">
+<link rel="stylesheet" href="vendor/fonts/ibm-plex-mono/500.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <button class="btn small" id="backBtn" type="button">‹ Projects</button>
+    <input type="text" id="projectName" class="project-name" aria-label="Project name" maxlength="80">
+    <div class="views" role="group" aria-label="View">
+      <button type="button" data-view="graph" aria-pressed="true">Graph</button>
+      <button type="button" data-view="board" aria-pressed="false">Board</button>
+    </div>
+    <span class="banner" id="banner" hidden></span>
+    <div class="tally" id="tally"></div>
+    <button class="btn small" id="exportBtn" type="button" title="Open this project's folder of markdown files">Show folder</button>
+  </header>
+  <div class="main">
+    <aside>
+      <section>
+        <h2>New ticket</h2>
+        <form id="createForm">
+          <div class="field"><label for="newTitle">Title</label><input type="text" id="newTitle" placeholder="e.g. Archer unit" required maxlength="80"></div>
+          <div class="field"><label for="newType">Type</label><select id="newType">
+            <option value="Content">Content: something in the game (unit, building…)</option>
+            <option value="Discipline">Discipline: work many things rely on (sound, 3D model…)</option></select></div>
+          <div class="field"><label for="newCat">Category</label><input type="text" id="newCat" list="catList" placeholder="e.g. Unit, Building, Sound" maxlength="30"></div>
+          <datalist id="catList"></datalist>
+          <div class="row"><button class="btn primary" type="submit">Create ticket</button></div>
+        </form>
+      </section>
+      <section id="inspector" aria-live="polite"></section>
+    </aside>
+    <div class="stage">
+      <div class="board" id="board" hidden>
+        <div class="board-bar"><label for="boardShow">Show</label><select id="boardShow">
+          <option value="tickets">Tickets</option><option value="links">Links</option><option value="all">Tickets and links</option></select>
+          <label for="groupBy">Columns by</label><select id="groupBy"></select><span>Drag a card to another column to change it.</span></div>
+        <div class="cols" id="cols"></div>
+      </div>
+      <div id="graphView">
+      <svg id="graph" role="img" aria-label="Graph of tickets and the links between them"></svg>
+      <div class="empty-stage" id="emptyStage" hidden><div><strong>No tickets yet</strong>Create two tickets, then link them from the details panel. Each link shows its strength from 0 to 10.</div></div>
+      <button class="btn small fit" id="fitBtn" type="button">Fit to view</button>
+      <div class="focusbar" id="focusBar" hidden><span id="focusText"></span><button class="btn small" type="button" id="showAllBtn">Show all</button></div>
+      <div class="legend">
+        <span><i style="--c: var(--s-red)"></i>0–3</span>
+        <span><i style="--c: var(--s-yellow)"></i>4–7</span>
+        <span><i style="--c: var(--s-green)"></i>8–9</span>
+        <span><i style="--c: var(--s-blue)"></i>10 done</span>
+        <span>Shift-click a ticket to link it to the selected one</span>
+        <span>Click a link to comment on it</span>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="relModal" hidden role="dialog" aria-modal="true" aria-labelledby="relTitle">
+  <div class="modal-card" id="relCard"></div>
+</div>
+
+<div class="picker" id="picker" hidden>
+  <div class="picker-inner">
+    <div class="picker-head"><h1 class="picker-title">Ticket Graph</h1><p class="muted">Pick a project, or start a new one.</p></div>
+    <div class="picker-grid">
+      <section><h2>Projects</h2><div class="proj-list" id="projectList"></div></section>
+      <section class="picker-side">
+        <h2>New project</h2>
+        <form id="newProjectForm">
+          <div class="field"><label for="newProjectName">Name</label><input type="text" id="newProjectName" required maxlength="80" placeholder="e.g. Space mod"></div>
+          <div class="field"><label for="newProjectDesc">Description</label><textarea id="newProjectDesc" maxlength="400" placeholder="Optional"></textarea></div>
+          <div class="field"><span class="lbl">Folder goes in</span><span class="where" id="newProjectWhere"></span>
+            <div class="row"><button class="btn small" type="button" id="chooseParentBtn">Change…</button></div></div>
+          <div class="row"><button class="btn primary" type="submit">Create project</button></div>
+        </form>
+        <h2 style="margin-top:22px">Open existing</h2>
+        <div class="row"><button class="btn" type="button" id="openFolderBtn">Open project folder…</button></div>
+        <p class="hint" id="openFolderMsg"></p>
+        <p class="hint">A project is a folder with <b>project.yaml</b> and a <b>tickets</b> folder of markdown files. Put it in your game's repo to version it with git.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/d3/d3.min.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
