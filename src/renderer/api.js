@@ -40,6 +40,8 @@
     put: (kind, dir, id, body) => post("/api/put", { kind, path: dir, id, body }),
     del: (kind, dir, id) => post("/api/del", { kind, path: dir, id }),
     setSetting: (dir, key, value) => post("/api/setting", { path: dir, key, value }),
+    passes: (dir, link) => post("/api/passes", { path: dir, link }),
+    addPass: (dir, link, pass) => post("/api/pass", { path: dir, link, pass }),
     onExternalChange: (cb) => { listeners.push(cb); if (!events) connect(); },
   };
 })();

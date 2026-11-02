@@ -5,7 +5,6 @@ type: Link
 between: [ BUI-3, 3DM-1 ]
 strength: 1
 status: To do
-ai_passes: "1"
 created: 2026-10-20T09:00:00.000Z
 ---
 

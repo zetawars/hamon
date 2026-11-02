@@ -8,6 +8,7 @@ const path = require("node:path");
 const YAML = require("yaml");
 
 const TICKETS_DIR = "tickets";
+const PASSES_DIR = "passes";   // passes/<LINK-KEY>/<NNN>.md: one file per iteration on a link
 const PROJECT_FILE = "project.yaml";
 // Front-matter fields with a fixed meaning; every other field is a free-form property.
 const RESERVED = ["key", "title", "type", "between", "strength", "created"];
@@ -60,6 +61,28 @@ function serializeTicket(kind, body) {
   return `---\n${doc.toString({ lineWidth: 0 }).trimEnd()}\n---\n${notes.trim() ? "\n" + notes.trim() + "\n" : ""}`;
 }
 
+/* ---------- passes: the iteration history of a link ---------- */
+// A pass records one attempt at the work a link stands for: the strength it reached (and came from),
+// the tool and who ran it, and references to what it produced. Assets and code are references only
+// (paths, URLs, commit hashes); nothing is copied into the project.
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
+const isUrl = (ref) => /^https?:\/\//i.test(ref);
+const isCommit = (ref) => /^[0-9a-f]{7,40}$/i.test(ref);
+const isImageRef = (ref) => IMAGE_EXT.test(String(ref).split(/[?#]/)[0]);
+
+function parsePass(text) {
+  const m = text.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/);
+  if (!m) throw new Error("no front matter");
+  const fm = YAML.parse(m[1]) || {};
+  const list = (v) => (Array.isArray(v) ? v : v ? [v] : []).map(x => typeof x === "object" ? String(Object.values(x)[0]) : String(x));
+  const num = (v) => Math.max(0, Math.min(10, Math.round(Number(v) || 0)));
+  return {
+    pass: Number(fm.pass) || 0, date: fm.date ? String(fm.date).slice(0, 10) : "", from: fm.from === undefined ? null : num(fm.from),
+    strength: num(fm.strength), tool: fm.tool ? String(fm.tool) : "", by: fm.by ? String(fm.by) : "",
+    assets: list(fm.assets), code: list(fm.code), notes: (m[2] || "").replace(/^\s*\n/, "").replace(/\s+$/, ""),
+  };
+}
+
 /* ---------- a project folder ---------- */
 function openProject(dir) {
   dir = path.resolve(dir);
@@ -72,6 +95,19 @@ function openProject(dir) {
   };
   const writeMeta = (meta) => writeAtomic(pfile, YAML.stringify(meta, { lineWidth: 0 }));
   const mdFiles = () => fs.existsSync(tdir) ? fs.readdirSync(tdir).filter(f => f.toLowerCase().endsWith(".md")) : [];
+
+  const pdir = (link) => path.join(dir, PASSES_DIR, link);
+  function passes(link) {
+    const d = pdir(link);
+    if (!fs.existsSync(d)) return [];
+    const out = [];
+    for (const f of fs.readdirSync(d).filter(f => f.toLowerCase().endsWith(".md"))) {
+      try { out.push({ ...parsePass(fs.readFileSync(path.join(d, f), "utf8")), file: `${PASSES_DIR}/${link}/${f}` }); } catch {}
+    }
+    return out.sort((a, b) => a.pass - b.pass);
+  }
+  // Relative asset paths resolve against project.yaml's asset_root (e.g. your game repo), else the project folder.
+  function assetBase() { const r = readMeta().asset_root; return r ? path.resolve(dir, String(r)) : dir; }
 
   // The file holding a key: usually "<KEY>-…md"; falls back to reading every file (hand-renamed files).
   function findFile(key) {
@@ -107,9 +143,15 @@ function openProject(dir) {
       for (const [id, l] of links) {
         for (const end of [l.a, l.b]) if (!known.has(end)) problems.push({ file: seen.get(id), error: `links to ${end}, which doesn't exist` });
       }
+      // Light pass summaries per link (no notes or assets), for trend arrows and "stuck" badges.
+      const passSummary = {};
+      for (const [id] of links) {
+        const ps = passes(id);
+        if (ps.length) passSummary[id] = ps.map(p => ({ pass: p.pass, date: p.date, from: p.from, strength: p.strength }));
+      }
       return {
-        project: { id: dir, path: dir, name: meta.name || path.basename(dir), description: meta.description || "" },
-        tickets, links, problems, settings: { board: meta.board || { columns: {} } },
+        project: { id: dir, path: dir, name: meta.name || path.basename(dir), description: meta.description || "", asset_root: meta.asset_root || "" },
+        tickets, links, problems, passes: passSummary, settings: { board: meta.board || { columns: {} } },
       };
     },
     put(kind, id, body) {
@@ -119,9 +161,37 @@ function openProject(dir) {
       writeAtomic(path.join(tdir, name), serializeTicket(kind, { ...body, key: body.key || id }));
       if (old && old !== name) fs.rmSync(path.join(tdir, old), { force: true });
     },
-    del(_kind, id) {
+    del(kind, id) {
       const f = findFile(id);
       if (f) fs.rmSync(path.join(tdir, f), { force: true });
+      if (kind === "links") fs.rmSync(pdir(id), { recursive: true, force: true });
+    },
+    passes,
+    // Records a new pass on a link and sets the link's strength to it. Returns the pass.
+    addPass(link, { strength, tool = "", by = "", assets = [], code = [], notes = "", date } = {}) {
+      const lf = findFile(link);
+      if (!lf) throw new Error(`No link ${link}.`);
+      const rec = parseTicket(fs.readFileSync(path.join(tdir, lf), "utf8"));
+      if (rec.kind !== "links") throw new Error(`${link} isn't a Link.`);
+      const s = Math.max(0, Math.min(10, Math.round(Number(strength))));
+      if (!Number.isFinite(s)) throw new Error("strength must be a number from 0 to 10");
+      const n = (passes(link).at(-1)?.pass || 0) + 1;
+      const fm = { pass: n, date: date || new Date().toISOString().slice(0, 10), from: rec.body.strength, strength: s };
+      if (tool.trim()) fm.tool = tool.trim();
+      if (by.trim()) fm.by = by.trim();
+      const clean = (xs) => xs.map(x => String(x).trim()).filter(Boolean);
+      if (clean(assets).length) fm.assets = clean(assets);
+      if (clean(code).length) fm.code = clean(code);
+      fs.mkdirSync(pdir(link), { recursive: true });
+      writeAtomic(path.join(pdir(link), `${String(n).padStart(3, "0")}.md`),
+        `---\n${YAML.stringify(fm, { lineWidth: 0 }).trimEnd()}\n---\n${notes.trim() ? "\n" + notes.trim() + "\n" : ""}`);
+      if (rec.body.strength !== s) this.put("links", link, { ...rec.body, strength: s });
+      return { ...fm, assets: fm.assets || [], code: fm.code || [], tool: fm.tool || "", by: fm.by || "", notes: notes.trim() };
+    },
+    // Where a referenced asset lives: { url } for web links, { file } for a local path (which may not exist).
+    resolveAsset(ref) {
+      if (isUrl(ref)) return { url: ref };
+      return { file: path.isAbsolute(ref) ? ref : path.resolve(assetBase(), ref) };
     },
     setSetting(key, value) { const meta = readMeta(); meta[key] = value; writeMeta(meta); },
     update({ name, description }) {
@@ -133,8 +203,13 @@ function openProject(dir) {
     // Changes whenever any project file changes; used to tell our own writes from outside edits.
     signature() {
       const parts = [];
-      for (const f of [pfile, ...mdFiles().map(f => path.join(tdir, f))]) {
-        try { const s = fs.statSync(f); parts.push(`${path.basename(f)}:${s.mtimeMs}:${s.size}`); } catch {}
+      const passFiles = [];
+      const pd = path.join(dir, PASSES_DIR);
+      if (fs.existsSync(pd)) for (const l of fs.readdirSync(pd)) {
+        try { for (const f of fs.readdirSync(path.join(pd, l))) passFiles.push(path.join(pd, l, f)); } catch {}
+      }
+      for (const f of [pfile, ...mdFiles().map(f => path.join(tdir, f)), ...passFiles]) {
+        try { const s = fs.statSync(f); parts.push(`${path.relative(dir, f)}:${s.mtimeMs}:${s.size}`); } catch {}
       }
       return parts.sort().join("|");
     },
@@ -190,4 +265,4 @@ function summarize(dir) {
 
 const projectFolderName = (name) => name.replace(/[\\/:*?"<>|]/g, "_").trim() || "Untitled project";
 
-module.exports = { openProject, registry, summarize, discover, knownProjects, REPO_PROJECTS, parseTicket, serializeTicket, fileNameFor, projectFolderName };
+module.exports = { openProject, registry, summarize, parsePass, isImageRef, isUrl, isCommit, discover, knownProjects, REPO_PROJECTS, parseTicket, serializeTicket, fileNameFor, projectFolderName };

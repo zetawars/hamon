@@ -27,7 +27,14 @@ exports.run = (win) => {
       await js(`boardShow = "links"; render()`);
       await wait(800); await shot("board-links");
       await js(`boardShow = "tickets"; render(); openRelation("LNK-5", "UNI-2")`);
-      await wait(600); await shot("link");
+      await wait(900); await shot("link");
+      await js(`relCard.querySelector(".passes").scrollIntoView({ block: "start" })`);
+      await wait(900); await shot("link-passes");
+      await js(`openLightbox(5, 0)`);
+      await wait(900); await shot("pass-compare");
+      await js(`lightbox.hidden = true; closeRelation(); openRelation("LNK-10", "UNI-3")`);
+      await wait(900); await js(`relCard.querySelector(".passes").scrollIntoView({ block: "start" })`);
+      await wait(500); await shot("link-stuck");
       console.log("screenshots written to", OUT);
     } catch (err) {
       console.log("screenshots failed:", err.stack || err);

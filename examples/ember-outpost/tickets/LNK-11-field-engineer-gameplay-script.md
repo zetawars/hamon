@@ -5,7 +5,6 @@ type: Link
 between: [ UNI-3, MEC-1 ]
 strength: 8
 status: In progress
-ai_passes: "4"
 created: 2026-10-20T09:00:00.000Z
 ---
 

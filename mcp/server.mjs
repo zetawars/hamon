@@ -4,13 +4,14 @@
 // and the open app reloads when files change. Run: node mcp/server.mjs   (TG_HOME overrides the app data folder)
 import { createRequire } from "node:module";
 import path from "node:path";
+import fs from "node:fs";
 import os from "node:os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
 const require = createRequire(import.meta.url);
-const { openProject, registry, summarize, knownProjects, REPO_PROJECTS } = require("../src/store.js");
+const { openProject, registry, summarize, knownProjects, REPO_PROJECTS, isImageRef, isUrl } = require("../src/store.js");
 const { uniqueDir } = require("../src/migrate.js");
 
 const HOME = process.env.TG_HOME || path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "Ticket Graph");
@@ -102,6 +103,7 @@ const server = new McpServer({ name: "ticket-graph", version: "2.0.0" }, {
   instructions: `Ticket Graph is the user's local project tracker. Each project is a folder; every ticket is a markdown file (YAML front matter + notes) in its tickets/ folder. The desktop app reloads on its own when these change.
 Ticket types: "Content" (a thing in the game, e.g. a unit or building), "Discipline" (a kind of work many things rely on, e.g. Sound, 3D Model, Mechanic) and "Link". The specific kind of Content/Discipline is the "category" property.
 A Link is itself a ticket (key LNK-n) between two tickets: it is the actual piece of work, e.g. "Tesla Trooper · 3D Model". It has a strength 0-10 (0 = no work done, 10 = all done; bands 0-3 red, 4-7 yellow, 8-9 green, 10 blue/done), properties such as status, and markdown notes.
+Each attempt at a link's work is a pass (passes/<LINK>/NNN.md): the strength it reached, the tool, who ran it, and references to what it produced (image/file paths, URLs, commit hashes; nothing is copied). Record a pass with record_pass every time you iterate on a link; it also sets the link's strength. A link with three passes in a row that didn't get stronger is "stuck".
 A ticket's progress = sum of its links' strengths / (10 x number of links). Board columns come from a property (status by default); status must be one of the project's status columns.
 Refer to projects by name and tickets by key (e.g. UNI-8, LNK-37) or title. Read before you write, and confirm with the user before deleting anything.`,
 });
@@ -198,7 +200,11 @@ server.registerTool("get_ticket", {
   inputSchema: { project: z.string(), ticket: z.string().describe("Key (e.g. UNI-8, LNK-37) or title") },
 }, tool(({ project, ticket }) => {
   const P = loadProject(project), id = findTicket(P, ticket, { allowLinks: true });
-  if (P.links.has(id)) { const l = P.links.get(id); return { ...linkSummary(P, id), props: l.props || {} }; }
+  if (P.links.has(id)) {
+    const l = P.links.get(id), ps = P.store.passes(id);
+    return { ...linkSummary(P, id), props: l.props || {}, passes: ps.length, stuck: stuckOf(ps),
+      ...(ps.length ? { last_pass: { pass: ps.at(-1).pass, date: ps.at(-1).date, change: `${ps.at(-1).from} → ${ps.at(-1).strength}`, notes: ps.at(-1).notes || null } } : {}) };
+  }
   const t = P.tickets.get(id);
   return { ...ticketSummary(P, id), props: t.props || {}, notes: t.notes || null,
     links: linksOf(P, id).map(([lid, l]) => ({ key: lid, to: `${otherEnd(l, id)} ${P.tickets.get(otherEnd(l, id)).title}`,
@@ -313,6 +319,62 @@ server.registerTool("remove_link", {
   if (!hit) throw new UserError("Those tickets aren't linked.");
   P.store.del("links", hit[0]); return `Deleted ${hit[0]} ${hit[1].title}.`;
 }));
+
+const IMAGE_MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" };
+function linkKeyFor(P, link, other) {
+  if (other) { const hit = findLink(P, findTicket(P, link), findTicket(P, other)); if (!hit) throw new UserError("Those tickets aren't linked."); return hit[0]; }
+  const id = findTicket(P, link, { allowLinks: true });
+  if (!P.links.has(id)) throw new UserError(`${id} isn't a Link. Pass a link key (LNK-n), or two ticket keys as link and other.`);
+  return id;
+}
+const stuckOf = (ps) => { const last = ps.at(-1), third = ps.at(-3); return ps.length >= 3 && last.strength < 10 && third.from !== null && last.strength <= third.from; };
+
+server.registerTool("record_pass", {
+  title: "Record a pass", description: "Record one iteration on a link: the strength it reached, the tool, references to what it produced, and what changed. Sets the link's strength. Assets and code are references only (paths, URLs, commit hashes); files are not copied.",
+  inputSchema: {
+    project: z.string(), link: z.string().describe("Link key (LNK-n), or one ticket of the pair when 'other' is given"),
+    other: z.string().optional().describe("The other ticket, to find the link by its two ends"),
+    strength: z.number().int().min(0).max(10).describe("Strength after this pass"),
+    notes: z.string().optional().describe("What this pass tried, and what's still wrong"),
+    tool: z.string().optional().describe("e.g. Meshy v4, Claude, Blender"),
+    by: z.string().default("claude").describe("Who ran the pass"),
+    assets: z.array(z.string()).optional().describe("Image or file paths (absolute, or relative to the project's asset_root) and URLs"),
+    code: z.array(z.string()).optional().describe("Commit hashes, file paths, URLs"),
+  },
+}, tool(({ project, link, other, strength, notes = "", tool: usedTool = "", by, assets = [], code = [] }) => {
+  const P = loadProject(project), lid = linkKeyFor(P, link, other);
+  const missing = assets.filter(a => !isUrl(a) && !fs.existsSync(P.store.resolveAsset(a).file));
+  const saved = P.store.addPass(lid, { strength, notes, tool: usedTool, by, assets, code });
+  const ps = P.store.passes(lid);
+  return { recorded: `${lid} pass ${saved.pass}: ${saved.from} → ${saved.strength}/10 (${band(saved.strength)})`, stuck: stuckOf(ps),
+    ...(missing.length ? { warning: `These asset paths don't exist (yet): ${missing.join(", ")}` } : {}) };
+}));
+
+server.registerTool("get_link_history", {
+  title: "Link history", description: "A link's passes, oldest first: strength before and after, tool, who, assets, code and notes. With include_images, also returns the images of the latest passes so you can look at the work.",
+  inputSchema: {
+    project: z.string(), link: z.string().describe("Link key (LNK-n), or one ticket of the pair when 'other' is given"), other: z.string().optional(),
+    include_images: z.boolean().default(false), image_passes: z.number().int().min(1).max(5).default(2).describe("How many of the latest passes to include images from"),
+  },
+}, async ({ project, link, other, include_images, image_passes }) => {
+  try {
+    const P = loadProject(project), lid = linkKeyFor(P, link, other), l = P.links.get(lid), ps = P.store.passes(lid);
+    const out = { link: `${lid} ${l.title}`, strength: l.strength, band: band(l.strength), stuck: stuckOf(ps),
+      passes: ps.map(({ file, ...p }) => ({ ...p, change: p.from === null ? null : p.strength - p.from })) };
+    const content = [{ type: "text", text: JSON.stringify(out, null, 2) }];
+    if (include_images) {
+      let n = 0;
+      for (const p of ps.slice(-image_passes)) for (const a of p.assets.filter(isImageRef)) {
+        if (n >= 6 || isUrl(a)) continue;
+        const file = P.store.resolveAsset(a).file, mime = IMAGE_MIME[path.extname(file).toLowerCase()];
+        if (!mime || !fs.existsSync(file) || fs.statSync(file).size > 4e6) continue;
+        content.push({ type: "text", text: `Pass ${p.pass} (${p.strength}/10): ${a}` });
+        content.push({ type: "image", data: fs.readFileSync(file).toString("base64"), mimeType: mime }); n++;
+      }
+    }
+    return { content };
+  } catch (e) { return { isError: true, content: [{ type: "text", text: e instanceof UserError ? e.message : `Error: ${e.message}` }] }; }
+});
 
 server.registerTool("set_board_columns", {
   title: "Set board columns", description: "Set the ordered column list for a property (e.g. status). Renames apply to every ticket and link with the old value; values no longer in the list are cleared.",

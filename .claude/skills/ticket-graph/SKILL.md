@@ -15,6 +15,7 @@ Ticket Graph is the tool in this repo (web app, desktop app, MCP server). Each p
 - **Link** (`LNK-n`): a ticket of its own, the actual piece of work between two tickets, e.g. "Tesla Trooper · 3D Model". It has `between: [KEY-A, KEY-B]` (Content side first), `strength` 0-10, properties such as `status`, and notes.
 - Bands: 0-3 red, 4-7 yellow, 8-9 green, 10 blue (done). A ticket's progress = its links' strengths / (10 x links).
 - `status` must be one of the project's status columns (`project.yaml` → `board.columns.status`).
+- **Passes**: every iteration on a link is a pass file (`passes/<LINK>/NNN.md`): `from` → `strength`, `tool`, `by`, `assets` (image or file paths, URLs), `code` (commit hashes, paths, URLs), and notes. References only; nothing is copied. Three passes in a row without getting stronger = **stuck**.
 
 File example (`tickets/LNK-123-tesla-trooper-3d-model.md`):
 
@@ -33,10 +34,11 @@ Blue gauntlets missing.
 
 ## Tools
 
-`list_projects`, `get_project` (bands, per-discipline and per-category progress, columns, unreadable files), `list_tickets` (filters: type incl. `Link`, category, status, search, `linked_to`, `band`), `get_ticket` (any key incl. LNK; shows notes and links), `create_ticket` (can create links in the same call), `update_ticket` (title, props, notes; strength for links), `set_link` (create or update the Link between two tickets), `remove_link`, `delete_ticket`, `set_board_columns`, `create_project`, `add_project_folder`, `update_project`, `remove_project_from_list` (files stay).
+`record_pass` (after every iteration you do on a link: new strength, tool, the renders/files/commits you produced, what changed), `get_link_history` (passes, and with `include_images` the latest renders so you can look at them before judging strength), `list_projects`, `get_project` (bands, per-discipline and per-category progress, columns, unreadable files), `list_tickets` (filters: type incl. `Link`, category, status, search, `linked_to`, `band`), `get_ticket` (any key incl. LNK; shows notes and links), `create_ticket` (can create links in the same call), `update_ticket` (title, props, notes; strength for links), `set_link` (create or update the Link between two tickets), `remove_link`, `delete_ticket`, `set_board_columns`, `create_project`, `add_project_folder`, `update_project`, `remove_project_from_list` (files stay).
 
 ## Habits
 
 - Read before writing, so you reuse existing category spellings and keys.
+- When you iterate on a link's work, record it with `record_pass` rather than only changing strength, and be honest about strength: a pass that didn't improve the output keeps the same number. If a link is stuck, say so and suggest a different approach.
 - Confirm with the user before deleting tickets or links, or removing board columns (that clears the value from tickets).
 - When reporting, name tickets as `KEY Title` and links as `LNK-n Title — n/10 (band)`, and quote link notes when they explain the state.

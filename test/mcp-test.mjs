@@ -42,8 +42,21 @@ await call("update_ticket", { project: "MCP Test", ticket: "LNK-1", strength: 10
 check((await call("list_tickets", { project: "MCP Test", band: "blue" })).length === 1, "band filter");
 await call("set_board_columns", { project: "MCP Test", columns: ["Backlog", "Doing", "Done"], renames: { "In progress": "Doing", "To do": "Backlog" } });
 check((await call("get_ticket", { project: "MCP Test", ticket: "LNK-1" })).status === "Doing", "column rename reaches links");
+// Passes: record iterations with referenced assets, then read the history back with images.
+const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+fs.mkdirSync(path.join(made.folder, "renders"), { recursive: true });
+fs.writeFileSync(path.join(made.folder, "renders", "archer-1.png"), Buffer.from(PNG, "base64"));
+await call("record_pass", { project: "MCP Test", link: "UNI-1", other: "SOU-1", strength: 6, tool: "ElevenLabs", notes: "bow twang ok",
+  assets: ["renders/archer-1.png", "https://example.com/take1"], code: ["3f2a9c1"] });
+await call("record_pass", { project: "MCP Test", link: "LNK-1", strength: 7, assets: ["renders/missing.png"] });
+const hist = await client.callTool({ name: "get_link_history", arguments: { project: "MCP Test", link: "LNK-1", include_images: true } });
+const histData = JSON.parse(hist.content[0].text);
+check(histData.passes.length === 2 && histData.passes[0].from === 10 && histData.passes[0].strength === 6 && histData.passes[1].change === 1, "pass history");
+check(hist.content.some(c => c.type === "image" && c.mimeType === "image/png"), "history returns the referenced image");
+check((await call("get_ticket", { project: "MCP Test", ticket: "LNK-1" })).strength === 7, "pass sets link strength");
+check(fs.existsSync(path.join(made.folder, "passes", "LNK-1", "002.md")), "pass files written");
 const ov = await call("get_project", { project: "MCP Test" });
-check(ov.overall === "100% done" && ov.links === 1, "overview");
+check(ov.overall === "70% done" && ov.links === 1, "overview");
 
 // The files themselves
 const dir = made.folder, files = fs.readdirSync(path.join(dir, "tickets")).sort();

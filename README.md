@@ -1,6 +1,6 @@
 # Ticket Graph
 
-**A personal project tracker for AI-assisted work.** Every ticket, and every link between two tickets, is a plain markdown file. Each link has a strength from 0 to 10 that tells you how close that piece of work is to done, so you can see how many more AI passes it is likely to need.
+**A personal project tracker for AI-assisted work.** Every ticket, and every link between two tickets, is a plain markdown file. Each link has a strength from 0 to 10 that tells you how close that piece of work is to done. Every AI iteration on it is recorded as a **pass**, with the images, files and commits it produced, so you can see whether each pass made the work stronger and how many more it is likely to need.
 
 Open source (MIT). Runs as a local web app or a desktop app, and comes with an **MCP server** so Claude (or any MCP client) can read and update your project for you.
 
@@ -14,8 +14,8 @@ Ticket Graph tracks **how strong each piece of work is right now** instead:
 
 - A **Link** connects a thing in your game to a kind of work, e.g. *Heavy Walker · 3D Model*. That link **is** the task.
 - Its **strength (0-10)** is your honest read of the current output: 0 means nothing usable, 10 means ship it. After each AI pass you move the slider.
-- Its **notes** keep the iteration history: what the last pass got wrong and what to try next. Add an `ai_passes` property if you want to count attempts.
-- Weak links (red, 0-3) are where the next iterations should go. Strong links (green, 8-9) need polish, not regeneration.
+- Every iteration is a **pass**: the strength it reached (and came from), the tool, who ran it, references to the renders, files and commits it produced, and what's still wrong. The pass history shows whether the work is converging.
+- Weak links (red, 0-3) are where the next iterations should go. Strong links (green, 8-9) need polish, not regeneration. A link that goes **three passes without getting stronger is flagged "Stuck"**: time to change approach rather than run the same prompt again.
 
 Progress rolls up from the links. Heavy Walker is 52% done because its five links average 5.2 out of 10, and the 3D Model discipline is 57% done across everything that needs a model. Nobody has to estimate anything up front.
 
@@ -56,7 +56,8 @@ Ticket Graph is built for one person, or one person plus their AI agents, runnin
 The MCP server (`mcp/server.mjs`) gives Claude the same view of the project you have. It can:
 
 - Report: "what's still red on Sound?", "how far along is the 3D Model work overall?"
-- Record a pass: "Heavy Walker's model is at 6 now, legs fixed, the cannon is still fused" sets the strength, appends the note and counts the pass.
+- Record a pass: "Heavy Walker's model is at 6 now, legs fixed, here's the render" calls `record_pass`, which writes the pass, references the render and the commit, and sets the strength.
+- Look at the work: `get_link_history` returns a link's passes, **including the latest renders as images**, so Claude can judge the output itself instead of guessing.
 - Plan: create tickets for new units and link them to every discipline at 0.
 - Organise: rename board columns, move work between statuses.
 
@@ -74,21 +75,45 @@ Switch the board to **Links** to see the individual pieces of work, grouped by t
 
 ![Board showing link cards, each with its strength](docs/images/board-links.png)
 
-Click any link (a line in the graph, a chip on a card, or a link card) to open it as a ticket of its own: strength, status, AI pass count and notes.
+Click any link (a line in the graph, a chip on a card, or a link card) to open it as a ticket of its own: strength, status, notes and its passes.
 
-![A link opened: Heavy Walker · 3D Model at 4/10 after 5 AI passes](docs/images/link.png)
+![A link opened: Heavy Walker · 3D Model at 4/10](docs/images/link.png)
+
+## Passes: did this iteration make it stronger?
+
+Each time you (or an agent) iterate on a link, record a **pass**. The link's timeline shows every pass, newest first:
+
+- **The strength change**, e.g. `3 → 4/10 ▲1`, or `= ` when a pass changed nothing.
+- **Thumbnails** of the images it produced, plus chips for other files (`walker_v5.fbx`), URLs and commits (`⎇ 9c41e07`).
+- **Who ran it, with which tool, and what changed.**
+- **A sparkline** of strength across all passes.
+
+![Five passes on Heavy Walker · 3D Model, each with its render, files, commit and notes](docs/images/link-passes.png)
+
+Click a thumbnail to compare it with the previous pass's image side by side:
+
+![Pass 4 and pass 5 side by side: the cannon is finally a separate mesh](docs/images/pass-compare.png)
+
+When a link stops improving, it's flagged. On the board, link chips show ▲ / ▼ for the last pass, and ⚠ when stuck.
+
+![Field Engineer · Sound: four passes, stuck at 5/10](docs/images/link-stuck.png)
+
+Assets and code are **references, not copies**: absolute paths, paths relative to the project (or to `asset_root` in `project.yaml`, e.g. your game repo), URLs and commit hashes. The project folder stays small, and your real files stay where they are. Recording a pass is deliberate: dragging the strength slider is still a quick edit and doesn't create one.
 
 ## The files
 
-The sample project lives in [`examples/ember-outpost`](examples/ember-outpost): 11 tickets and 24 links for a small sci-fi base builder.
+The sample project lives in [`examples/ember-outpost`](examples/ember-outpost): 11 tickets and 24 links for a small sci-fi base builder, with pass histories on four links.
 
 ```
 examples/ember-outpost/
-  project.yaml                               # name, description, board columns
+  project.yaml                               # name, description, board columns (and optional asset_root)
   tickets/
     UNI-2-heavy-walker.md                    # Content
     3DM-1-3d-model.md                        # Discipline
     LNK-5-heavy-walker-3d-model.md           # Link
+  passes/
+    LNK-5/001.md … 005.md                    # one file per pass on LNK-5
+  art/                                       # sketches the sample passes reference
 ```
 
 [`LNK-5-heavy-walker-3d-model.md`](examples/ember-outpost/tickets/LNK-5-heavy-walker-3d-model.md):
@@ -109,7 +134,32 @@ Pass 5: legs still clip when walking. The generator keeps merging the cannon int
 Next: generate the cannon as a separate mesh.
 ```
 
-The fixed front-matter fields are `key`, `title`, `type`, `between` and `strength` (links only), and `created`. Every other field is a free-form property. Everything after the front matter is notes. Keys never change; the file name follows the title.
+A pass, [`passes/LNK-5/005.md`](examples/ember-outpost/passes/LNK-5/005.md):
+
+```markdown
+---
+pass: 5
+date: 2026-11-01
+from: 3
+strength: 4
+tool: Meshy v4 + Blender
+by: you
+assets:
+  - art/heavy-walker-5.svg
+  - Art/Units/HeavyWalker/walker_v5.fbx
+  - https://www.meshy.ai/
+code:
+  - 9c41e07
+  - Assets/Scripts/Units/HeavyWalkerRig.cs
+---
+
+Generated the cannon as a separate mesh and parented it in Blender. Legs still clip.
+Next: fix the knee pivot, then retopo.
+```
+
+Passes are append-only files, so two agents recording passes never edit the same file.
+
+In a ticket file, the fixed front-matter fields are `key`, `title`, `type`, `between` and `strength` (links only), and `created`. Every other field is a free-form property. Everything after the front matter is notes. Keys never change; the file name follows the title.
 
 ## Run it
 

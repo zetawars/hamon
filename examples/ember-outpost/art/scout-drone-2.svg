@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" width="640" height="480">
+<rect width="320" height="240" fill="#e9edf2"/><ellipse cx="160" cy="214" rx="96" ry="10" fill="#cfd6df"/>
+<ellipse cx="160" cy="120" rx="44" ry="24" fill="#6b7a8f"/>
+<rect x="70" y="104" width="62" height="8" rx="4" fill="#46505e"/><rect x="188" y="104" width="62" height="8" rx="4" fill="#46505e"/><ellipse cx="86" cy="104" rx="22" ry="5" fill="#9aa6b5"/><ellipse cx="234" cy="104" rx="22" ry="5" fill="#9aa6b5"/>
+
+<text x="12" y="228" font-family="monospace" font-size="11" fill="#5b6878">pass 2: good silhouette</text></svg>

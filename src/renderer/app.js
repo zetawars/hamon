@@ -268,7 +268,8 @@ function linkCard(lid, l) {
   const A = tickets.get(l.a), B = tickets.get(l.b); if (!A || !B) return "";
   const end = (k, t) => `<button type="button" data-act="goto" data-id="${k}" style="--c:${typeColor(t.type)}" title="${esc(t.title)}">${esc(t.key)}</button>`;
   return `<div class="card link-card" draggable="true" tabindex="0" role="button" data-id="${lid}" data-link="1" style="--c:${bandColor(l.strength)}">
-    <div class="meta"><span class="key">${esc(l.key)}</span><span class="chip" style="--c:${bandColor(l.strength)}">Link · ${l.strength}/10</span></div>
+    <div class="meta"><span class="key">${esc(l.key)}</span><span class="chip" style="--c:${bandColor(l.strength)}">Link · ${l.strength}/10</span>
+      ${trendOf(lid).stuck ? `<span class="stuck">Stuck</span>` : trendOf(lid).count ? `<span class="muted passes-n">${trendOf(lid).count} passes${trendGlyph(lid)}</span>` : ""}</div>
     <div class="ct">${esc(l.title)}</div>
     <div class="bars">${end(l.a, A)}${end(l.b, B)}</div>
     ${progressBar({ done: l.strength, total: 10 })}
@@ -324,7 +325,7 @@ function renderBoard() {
           <div class="meta"><span class="key">${esc(t.key)}</span><span class="chip" style="--c:${typeColor(t.type)}">${esc(t.props?.category || t.type)}</span></div>
           <div class="ct">${esc(t.title)}</div>
           ${ls.length ? `<div class="bars">${ls.map(([lid, l]) => { const o = tickets.get(otherEnd(l, id));
-            return `<button type="button" data-act="rel" data-lid="${lid}" data-from="${id}" style="--c:${bandColor(l.strength)}" title="${esc(o.title)}: ${l.strength}/10${l.comment ? " · " + esc(l.comment) : ""}">${esc(o.key)} ${l.strength}</button>`; }).join("")}</div>` : ""}
+            return `<button type="button" data-act="rel" data-lid="${lid}" data-from="${id}" style="--c:${bandColor(l.strength)}" title="${esc(o.title)}: ${l.strength}/10${trendOf(lid).count ? `, ${trendOf(lid).count} passes` : ""}${trendOf(lid).stuck ? ", stuck" : ""}${l.comment ? " · " + esc(l.comment) : ""}">${esc(o.key)} ${l.strength}${trendGlyph(lid)}</button>`; }).join("")}</div>` : ""}
           ${progressBar(progressOf(id))}
         </div>`; }).join("") : `<div class="col-empty">Drop a card here</div>`}</div></div>`;
   }).join("") + (isType ? "" : `<div class="add-col">
@@ -448,7 +449,7 @@ let rel = null;   // { lid, from, opener, armed }
 const relModal = $("relModal"), relCard = $("relCard");
 function openRelation(lid, from = links.get(lid)?.a) {
   if (!links.has(lid)) return;
-  rel = { lid, from, opener: document.activeElement, armed: false };
+  rel = { lid, from, opener: document.activeElement, armed: false, passes: null, passesKey: null, formOpen: false };
   relModal.hidden = false;
   renderRelation();
   relCard.querySelector('[data-act="close"]')?.focus();
@@ -489,6 +490,7 @@ function renderRelation() {
       <span class="lbl">Notes</span>
       ${commentBox(rel.lid, l)}
     </div>
+    ${passesSection(rel.lid, l)}
     <details class="rel-box rel-about" style="--c:${typeColor(to.type)}">
       <summary>About <span class="key">${esc(to.key)}</span> ${esc(to.title)}</summary>
       ${progressBar(progressOf(toId))}
@@ -497,12 +499,20 @@ function renderRelation() {
     <div class="row">
       <button class="btn danger ${rel.armed ? "armed" : ""}" type="button" data-act="unlink">${rel.armed ? "Click again to delete this link" : "Delete link"}</button>
     </div>`;
+  if (rel.passesKey !== JSON.stringify(passSummary[rel.lid] || [])) loadPasses();
 }
 relModal.addEventListener("click", (e) => {
   if (e.target === relModal) { closeRelation(); return; }
   const b = e.target.closest("button[data-act]"); if (!b) return;
   const a = b.dataset.act;
   if (a === "close") closeRelation();
+  if (a === "newpass") { rel.formOpen = true; renderRelation(); $("pfNotes")?.focus(); }
+  if (a === "cancelpass") { rel.formOpen = false; renderRelation(); relCard.querySelector('[data-act="newpass"]')?.focus(); }
+  if (a === "zoom") openLightbox(+b.dataset.pass, +b.dataset.i);
+  if (a === "copy") {
+    const label = b.innerHTML;
+    navigator.clipboard?.writeText(b.dataset.text).then(() => { b.textContent = "Copied"; setTimeout(() => { b.innerHTML = label; }, 1200); }).catch(() => {});
+  }
   if (a === "addprop") {
     const k = $("relPropK").value.trim(); if (!k) { $("relPropK").focus(); return; }
     const l = links.get(rel.lid); saveLink(rel.lid, { ...l, props: { ...l.props, [k]: $("relPropV").value.trim() } });
@@ -518,8 +528,9 @@ relModal.addEventListener("click", (e) => {
     drop(links, "links", lid);
   }
 });
+relModal.addEventListener("submit", (e) => { if (e.target.id === "passForm") { e.preventDefault(); savePass(); } });
 relModal.addEventListener("input", (e) => {
-  if (e.target.dataset.act !== "strength") return;
+  if (e.target.dataset.act !== "strength" && e.target.dataset.act !== "pfstrength") return;
   const s = +e.target.value, box = e.target.closest(".link");
   box.style.setProperty("--c", bandColor(s));
   box.querySelector(".sval").textContent = `${s}/10 · ${BAND_LABEL[band(s)]}`;
@@ -535,6 +546,7 @@ relModal.addEventListener("keydown", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if (!rel) return;
+  if (e.key === "Escape" && !lightbox.hidden) { e.preventDefault(); lightbox.hidden = true; return; }
   if (e.key === "Escape") { e.preventDefault(); closeRelation(); return; }
   if (e.key === "Tab") {   // keep keyboard focus inside the popup
     const f = [...relCard.querySelectorAll("button, input, textarea, select, summary")];
@@ -546,12 +558,137 @@ document.addEventListener("keydown", (e) => {
 });
 function refreshRelation() {
   if (!rel) return;
+  if (rel.formOpen) { if (rel.passesKey !== JSON.stringify(passSummary[rel.lid] || [])) loadPasses(); return; }   // don't wipe a half-filled pass
   const active = document.activeElement;
   if (relCard.contains(active) && (active.tagName === "TEXTAREA" || (active.tagName === "INPUT" && active.type === "text"))) return;
   const act = relCard.contains(active) ? active.dataset.act : null;
   renderRelation();
   if (act) relCard.querySelector(`[data-act="${act}"]`)?.focus();
 }
+
+/* ---------- passes: the iteration history of a link ---------- */
+// Each pass is one attempt at a link's work: what it reached (from → strength), the tool, and references to
+// what it produced (images, files, URLs, commits). Recording a pass sets the link's strength.
+let passSummary = {};   // link key -> [{ pass, date, from, strength }] (light; full passes load when a link opens)
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
+const isImage = (ref) => IMAGE_RE.test(String(ref).split(/[?#]/)[0]);
+const isUrlRef = (ref) => /^https?:\/\//i.test(ref);
+const isCommitRef = (ref) => /^[0-9a-f]{7,40}$/i.test(ref);
+function trendOf(lid) {
+  const ps = passSummary[lid] || [], last = ps.at(-1);
+  if (!last) return { count: 0, delta: null, stuck: false };
+  // Stuck: three passes in a row that didn't make it any stronger.
+  const third = ps.at(-3);
+  const stuck = ps.length >= 3 && last.strength < 10 && third.from !== null && last.strength <= third.from;
+  return { count: ps.length, delta: last.from === null ? null : last.strength - last.from, stuck };
+}
+const trendGlyph = (lid) => { const t = trendOf(lid); return t.stuck ? " ⚠" : t.delta > 0 ? " ▲" : t.delta < 0 ? " ▼" : ""; };
+const fmtDay = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
+
+function sparkline(sum) {
+  const pts = [sum[0].from ?? sum[0].strength, ...sum.map(p => p.strength)];
+  const w = 150, h = 32, step = pts.length > 1 ? w / (pts.length - 1) : 0;
+  const xy = pts.map((v, i) => [Math.round(i * step) + 4, Math.round(h - 4 - v / 10 * (h - 8))]);
+  return `<svg class="spark" viewBox="0 0 ${w + 8} ${h}" width="${w + 8}" height="${h}" role="img" aria-label="Strength over passes: ${pts.join(", ")}">
+    <polyline points="${xy.map(p => p.join(",")).join(" ")}" fill="none" stroke="${bandColor(pts.at(-1))}" stroke-width="2" stroke-linejoin="round"/>
+    ${xy.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i === xy.length - 1 ? 3.5 : 2.2}" fill="${bandColor(pts[i])}"/>`).join("")}</svg>`;
+}
+const assetSrc = (lid, p, i) => isUrlRef(p.assets[i]) ? p.assets[i]
+  : `/api/asset?path=${encodeURIComponent(projectId)}&link=${encodeURIComponent(lid)}&pass=${p.pass}&i=${i}`;
+function refChip(ref, isCode) {
+  if (isUrlRef(ref)) {
+    const short = ref.replace(/^https?:\/\/(www\.)?/i, "").slice(0, 38);
+    return `<a class="ref" href="${esc(ref)}" target="_blank" rel="noopener noreferrer" title="${esc(ref)}">↗ ${esc(short)}</a>`;
+  }
+  if (isCode && isCommitRef(ref)) return `<button type="button" class="ref mono" data-act="copy" data-text="${esc(ref)}" title="Commit ${esc(ref)}. Click to copy.">⎇ ${esc(ref.slice(0, 7))}</button>`;
+  const name = ref.split(/[\\/]/).pop();
+  return `<button type="button" class="ref${isCode ? " mono" : ""}" data-act="copy" data-text="${esc(ref)}" title="${esc(ref)}. Click to copy the path.">${isCode ? "</>" : "▤"} ${esc(name)}</button>`;
+}
+function passCard(lid, p) {
+  const d = p.from === null ? null : p.strength - p.from;
+  const imgs = p.assets.map((a, i) => [a, i]).filter(([a]) => isImage(a));
+  const files = p.assets.filter(a => !isImage(a));
+  return `<article class="pass">
+    <div class="pass-head"><b>Pass ${p.pass}</b><span class="muted">${esc(fmtDay(p.date))}</span>
+      <span class="delta ${d > 0 ? "up" : d < 0 ? "down" : "same"}" style="--c:${bandColor(p.strength)}">${p.from === null ? "" : `${p.from} → `}${p.strength}/10${d === null ? "" : d > 0 ? ` ▲${d}` : d < 0 ? ` ▼${-d}` : " ="}</span>
+      ${p.tool ? `<span class="chip" style="--c:var(--muted)">${esc(p.tool)}</span>` : ""}${p.by ? `<span class="muted">by ${esc(p.by)}</span>` : ""}</div>
+    ${imgs.length ? `<div class="thumbs">${imgs.map(([a, i]) => `<button type="button" class="thumb" data-act="zoom" data-pass="${p.pass}" data-i="${i}" title="${esc(a)}"><img src="${esc(assetSrc(lid, p, i))}" alt="${esc(a.split(/[\\/]/).pop())}" loading="lazy"></button>`).join("")}</div>` : ""}
+    ${files.length || p.code.length ? `<div class="refs">${files.map(a => refChip(a, false)).join("")}${p.code.map(c => refChip(c, true)).join("")}</div>` : ""}
+    ${p.notes ? `<div class="pass-notes">${esc(p.notes)}</div>` : ""}
+  </article>`;
+}
+function passListHtml(lid) {
+  const ps = rel?.passes;
+  if (!ps) return `<p class="hint">Loading passes…</p>`;
+  if (!ps.length) return `<p class="hint">No passes yet. Record one each time you iterate on this work: what you tried, what it produced, and how strong it is now.</p>`;
+  return ps.slice().reverse().map(p => passCard(lid, p)).join("");
+}
+function passForm(l) {
+  const lastTool = rel.passes?.at(-1)?.tool || "";
+  return `<form class="pass-form" id="passForm">
+    <div class="link" style="--c:${bandColor(l.strength)}"><span class="lbl">Strength after this pass</span>
+      <div class="strength"><input type="range" min="0" max="10" step="1" value="${l.strength}" id="pfStrength" data-act="pfstrength" aria-label="Strength after this pass">
+        <span class="sval">${l.strength}/10 · ${BAND_LABEL[band(l.strength)]}</span></div></div>
+    <div class="field"><label for="pfTool">Tool</label><input type="text" id="pfTool" value="${esc(lastTool)}" placeholder="e.g. Meshy v4, Claude, Blender" maxlength="80"></div>
+    <div class="field"><label for="pfAssets">Assets</label><textarea id="pfAssets" placeholder="One per line: image or file paths, URLs"></textarea></div>
+    <div class="field"><label for="pfCode">Code</label><textarea id="pfCode" placeholder="One per line: commit hashes, file paths, URLs"></textarea></div>
+    <div class="field"><label for="pfNotes">What changed</label><textarea id="pfNotes" placeholder="What this pass tried, and what's still wrong"></textarea></div>
+    <div class="row"><button class="btn primary" type="submit">Save pass</button><button class="btn" type="button" data-act="cancelpass">Cancel</button></div>
+  </form>`;
+}
+function passesSection(lid, l) {
+  const sum = passSummary[lid] || [], t = trendOf(lid);
+  return `<section class="rel-box passes" style="--c:${bandColor(l.strength)}">
+    <div class="passes-head"><span class="lbl">Passes${sum.length ? ` (${sum.length})` : ""}</span>
+      ${t.stuck ? `<span class="stuck" title="Three passes in a row without getting stronger. Time to change approach?">Stuck</span>` : ""}
+      ${sum.length ? sparkline(sum) : ""}
+      ${rel.formOpen ? "" : `<button class="btn small primary" type="button" data-act="newpass">Record pass</button>`}</div>
+    ${rel.formOpen ? passForm(l) : ""}
+    <div class="pass-list">${passListHtml(lid)}</div></section>`;
+}
+// Fetches a link's full passes when it opens, and again whenever its pass summary changes (a new pass, from anyone).
+async function loadPasses() {
+  if (!rel || !projectId) return;
+  const lid = rel.lid;
+  rel.passesKey = JSON.stringify(passSummary[lid] || []);
+  try {
+    const ps = await window.tg.passes(projectId, lid);
+    if (rel?.lid !== lid) return;
+    rel.passes = ps;
+    const list = relCard.querySelector(".pass-list");
+    if (list) list.innerHTML = passListHtml(lid);
+  } catch (e) { showError(e); }
+}
+async function savePass() {
+  const lid = rel.lid, lines = (id) => $(id).value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const pass = { strength: +$("pfStrength").value, tool: $("pfTool").value, by: "you", assets: lines("pfAssets"), code: lines("pfCode"), notes: $("pfNotes").value };
+  try {
+    const saved = await window.tg.addPass(projectId, lid, pass);
+    links.set(lid, { ...links.get(lid), strength: saved.strength });
+    passSummary[lid] = [...(passSummary[lid] || []), { pass: saved.pass, date: saved.date, from: saved.from, strength: saved.strength }];
+    rel.formOpen = false;
+    rel.passes = [...(rel.passes || []), saved];
+    rel.passesKey = JSON.stringify(passSummary[lid]);
+    render(); renderRelation();
+    relCard.querySelector('[data-act="newpass"]')?.focus();
+  } catch (e) { showError(e); }
+}
+
+// Lightbox: a pass's image, side by side with the previous pass's image so you can see what changed.
+const lightbox = document.createElement("div");
+lightbox.className = "lightbox"; lightbox.hidden = true;
+lightbox.setAttribute("role", "dialog"); lightbox.setAttribute("aria-label", "Image");
+document.body.append(lightbox);
+function openLightbox(passNo, i) {
+  const ps = rel?.passes || [], p = ps.find(x => x.pass === passNo); if (!p) return;
+  const fig = (pp, idx) => `<figure><img src="${esc(assetSrc(rel.lid, pp, idx))}" alt="">
+    <figcaption>Pass ${pp.pass} · ${pp.strength}/10${pp.tool ? ` · ${esc(pp.tool)}` : ""} <span class="muted">${esc(pp.assets[idx].split(/[\\/]/).pop())}</span></figcaption></figure>`;
+  const prev = ps.filter(x => x.pass < passNo && x.assets.some(isImage)).at(-1);
+  lightbox.innerHTML = `<div class="lb-row">${prev ? fig(prev, prev.assets.findIndex(isImage)) : ""}${fig(p, i)}</div>
+    <p class="lb-hint">${prev ? `Pass ${prev.pass} on the left, pass ${p.pass} on the right. ` : ""}Click anywhere or press Esc to close.</p>`;
+  lightbox.hidden = false;
+}
+lightbox.addEventListener("click", () => { lightbox.hidden = true; });
 
 /* ---------- graph ---------- */
 const svg = d3.select("#graph");
@@ -785,6 +922,7 @@ function applyData(data) {
   for (const [id, body] of data.tickets) tickets.set(id, body);
   for (const [id, body] of data.links) links.set(id, body);
   boardCfg = { columns: {}, ...(data.settings.board || {}) };
+  passSummary = data.passes || {};
   const b = $("banner");
   b.hidden = !data.problems.length;
   b.textContent = data.problems.length

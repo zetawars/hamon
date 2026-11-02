@@ -22,6 +22,7 @@ A project folder holds `project.yaml` (name, description, `board.columns`) and `
 - `type` is `Content` (things in the game; the kind goes in `category`), `Discipline` (work many things rely on: Sound, 3D Model…) or `Link`.
 - A Link (`LNK-n`) is the piece of work between two tickets. It has `between: [ KEY-A, KEY-B ]` (Content side first) and `strength` 0-10. Bands: 0-3 red, 4-7 yellow, 8-9 green, 10 blue.
 - Keys never change. The file name follows the title. `status` must be one of `board.columns.status`.
+- Passes: `passes/<LINK-KEY>/<NNN>.md`, one file per iteration on a link. Front matter is `pass`, `date`, `from`, `strength`, `tool`, `by`, `assets` and `code`; the body holds notes. Assets and code are references (paths, URLs, commit hashes), never copies; relative paths resolve against `asset_root` in `project.yaml`, else the project folder. Recording a pass sets the link's strength (`store.addPass`), but editing strength directly does not create a pass. "Stuck" means three passes in a row without getting stronger; that logic exists in both `app.js` (`trendOf`) and `mcp/server.mjs` (`stuckOf`). The server only serves images that a pass file references (`/api/asset`).
 
 The `ticket-graph` skill (`.claude/skills/ticket-graph/SKILL.md`) explains how to manage a project's tickets through the MCP tools. `.mcp.json` registers the server for sessions in this repo; run `npm install` first.
 

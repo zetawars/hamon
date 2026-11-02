@@ -5,6 +5,5 @@ type: Link
 between: [ BUI-2, MEC-1 ]
 strength: 10
 status: Done
-ai_passes: "1"
 created: 2026-10-20T09:00:00.000Z
 ---

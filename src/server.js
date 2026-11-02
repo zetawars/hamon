@@ -6,12 +6,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { spawn } = require("node:child_process");
-const { openProject, registry, summarize, knownProjects, REPO_PROJECTS } = require("./store");
+const { openProject, registry, summarize, knownProjects, REPO_PROJECTS, isImageRef } = require("./store");
 const { uniqueDir } = require("./migrate");
 
 const ROOT = path.join(__dirname, "..");
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-  ".woff2": "font/woff2", ".woff": "font/woff", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon" };
+  ".woff2": "font/woff2", ".woff": "font/woff", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
+  ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".avif": "image/avif", ".bmp": "image/bmp" };
 // URL prefix -> folder for static files. /vendor serves only the few browser libraries the page uses.
 const STATIC = [
   ["/vendor/d3/", path.join(ROOT, "node_modules", "d3", "dist")],
@@ -49,7 +50,9 @@ function startServer({ home = defaultHome(), projectsRoot, port = Number(process
         if (sig !== w.known) { w.known = sig; send("changed", { dir }); }
       }, 350);
     };
-    for (const t of [dir, path.join(dir, "tickets")]) { try { w.watchers.push(fs.watch(t, check)); } catch {} }
+    // Recursive, so pass files (passes/<LINK>/NNN.md) are noticed too.
+    try { w.watchers.push(fs.watch(dir, { recursive: true }, check)); }
+    catch { for (const t of [dir, path.join(dir, "tickets")]) { try { w.watchers.push(fs.watch(t, check)); } catch {} } }
     watches.set(dir, w);
   }
   // After an API write: record the new state so the watcher doesn't report it again, and tell every
@@ -92,6 +95,8 @@ function startServer({ home = defaultHome(), projectsRoot, port = Number(process
     },
     "POST /api/put": ({ kind, path: dir, id, body }, by) => { openProject(dir).put(kind, id, body); afterWrite(dir, by); },
     "POST /api/del": ({ kind, path: dir, id }, by) => { openProject(dir).del(kind, id); afterWrite(dir, by); },
+    "POST /api/passes": ({ path: dir, link }) => openProject(dir).passes(link),
+    "POST /api/pass": ({ path: dir, link, pass }, by) => { const r = openProject(dir).addPass(link, pass); afterWrite(dir, by); return r; },
     "POST /api/setting": ({ path: dir, key, value }, by) => { openProject(dir).setSetting(key, value); afterWrite(dir, by); },
   };
 
@@ -101,6 +106,22 @@ function startServer({ home = defaultHome(), projectsRoot, port = Number(process
     req.on("end", () => { try { resolve(data ? JSON.parse(data) : {}); } catch { reject(Object.assign(new Error("Bad JSON"), { status: 400 })); } });
   });
   const json = (res, status, data) => { res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(data ?? null)); };
+
+  // Serves an image that a pass references, so thumbnails work. Only images named in that pass file are served,
+  // never an arbitrary path.
+  function serveAsset(res, q) {
+    try {
+      const proj = openProject(q.get("path"));
+      const pass = proj.passes(q.get("link")).find(p => String(p.pass) === q.get("pass"));
+      const ref = pass?.assets[Number(q.get("i"))];
+      if (!ref || !isImageRef(ref)) { res.writeHead(404); return res.end("No such image"); }
+      const { file } = proj.resolveAsset(ref);
+      if (!file || !fs.existsSync(file)) { res.writeHead(404); return res.end("Image file not found"); }
+      res.writeHead(200, { "content-type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream", "cache-control": "no-cache",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" });
+      fs.createReadStream(file).pipe(res);
+    } catch (e) { res.writeHead(400); res.end(e.message); }
+  }
 
   function serveStatic(req, res, pathname) {
     for (const [prefix, dir] of STATIC) {
@@ -134,6 +155,7 @@ function startServer({ home = defaultHome(), projectsRoot, port = Number(process
       catch (e) { json(res, e.status || 500, { error: e.message }); }
       return;
     }
+    if (pathname === "/api/asset" && req.method === "GET") return serveAsset(res, new URL(req.url, "http://localhost").searchParams);
     if (pathname.startsWith("/api/")) return json(res, 404, { error: "Unknown API route" });
     serveStatic(req, res, pathname);
   });

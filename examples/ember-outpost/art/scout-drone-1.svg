@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" width="640" height="480">
+<rect width="320" height="240" fill="#e9edf2"/><ellipse cx="160" cy="214" rx="96" ry="10" fill="#cfd6df"/>
+<ellipse cx="160" cy="120" rx="44" ry="24" fill="#6b7a8f"/>
+
+
+<text x="12" y="228" font-family="monospace" font-size="11" fill="#5b6878">pass 1: wrong proportions</text></svg>
