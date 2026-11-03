@@ -1,8 +1,8 @@
-# Ticket Graph
+# Hamon
 
 A project tracker where every ticket, and every link between two tickets, is its own markdown file. Web app first (`npm run web`), desktop app second (Electron wraps the same web server, `npm start`), plus an MCP server so Claude can use it (`mcp/server.mjs`).
 
-This repo holds the tool only. Project data lives in project folders outside the repo (by default `Documents\Ticket Graph\<project>`; `projects/` here is gitignored).
+This repo holds the tool only. Project data lives in project folders outside the repo (by default `Documents\Hamon\<project>`; `projects/` here is gitignored).
 
 ## Layout
 
@@ -13,7 +13,7 @@ This repo holds the tool only. Project data lives in project folders outside the
 - `mcp/server.mjs`: MCP tools over `src/store.js`.
 - `src/migrate.js`, `src/db.js`: one-time move from the old SQLite version. `better-sqlite3` is an optional dependency used only there.
 - `examples/ember-outpost`: the sample project used by the README. `scripts/example-project.js` (`npm run docs:example`) rebuilds it, and `scripts/screenshots.js` (`npm run docs:screenshots`) recaptures `docs/images/` from it without writing anything. Re-run both when the UI or format changes.
-- `test/mcp-test.mjs` (`npm test`): MCP end to end in a throwaway folder. `test/smoke.js`: desktop screenshots, run with `TG_HOME=.smoke/home TG_PROJECTS=<folder of test projects> TG_SMOKE=.smoke npx electron .`. Always point tests at copies, never at real project folders.
+- `test/mcp-test.mjs` (`npm test`): MCP end to end in a throwaway folder. `test/smoke.js`: desktop screenshots, run with `HAMON_HOME=.smoke/home HAMON_PROJECTS=<folder of test projects> HAMON_SMOKE=.smoke npx electron .`. Always point tests at copies, never at real project folders.
 
 ## Data format (summary)
 
@@ -24,15 +24,17 @@ A project folder holds `project.yaml` (name, description, `board.columns`) and `
 - Keys never change. The file name follows the title. `status` must be one of `board.columns.status`.
 - Passes: `passes/<LINK-KEY>/<NNN>.md`, one file per iteration on a link. Front matter is `pass`, `date`, `from`, `strength`, `tool`, `by`, `assets` and `code`; the body holds notes. Assets and code are references (paths, URLs, commit hashes), never copies; relative paths resolve against `asset_root` in `project.yaml`, else the project folder. Recording a pass sets the link's strength (`store.addPass`), but editing strength directly does not create a pass. "Stuck" means three passes in a row without getting stronger; that logic exists in both `app.js` (`trendOf`) and `mcp/server.mjs` (`stuckOf`). The server only serves images that a pass file references (`/api/asset`).
 
-The `ticket-graph` skill (`.claude/skills/ticket-graph/SKILL.md`) explains how to manage a project's tickets through the MCP tools. `.mcp.json` registers the server for sessions in this repo; run `npm install` first.
+The `hamon` skill (`.claude/skills/hamon/SKILL.md`) explains how to manage a project's tickets through the MCP tools. `.mcp.json` registers the server for sessions in this repo; run `npm install` first.
 
 ## Commands
 
 ```bash
 npm install          # everything (Electron included)
 npm install --omit=dev   # web server + MCP server only
-npm run web          # http://localhost:4387 (PORT to change; TG_HOME / TG_PROJECTS for test data)
+npm run web          # http://localhost:4387 (PORT to change; HAMON_HOME / HAMON_PROJECTS for test data)
 npm start            # desktop app
 npm test             # MCP tests
 npm run dist         # Windows installer in dist/
 ```
+
+The app was called Ticket Graph before 1.2.0. `store.appHome()` copies the old `%APPDATA%\Ticket Graph\projects.json` into `%APPDATA%\Hamon` on first run; existing project folders (for example `Documents\Ticket Graph\...`) are left where they are and stay on the list.

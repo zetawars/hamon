@@ -859,7 +859,7 @@ async function showPicker() {
   closeRelation();
   projectId = null;
   window.tg.close();
-  document.title = "Ticket Graph";
+  document.title = "Hamon";
   $("picker").hidden = false;
   await renderProjectList();
   $("newProjectWhere").textContent = newParent || await window.tg.defaultRoot();
@@ -937,7 +937,7 @@ async function openProject(dir) {
   applyData(data);
   selected = null; selectedLink = null; armedDelete = false; lastFocus = "";
   $("projectName").value = data.project.name;
-  document.title = `${data.project.name} · Ticket Graph`;
+  document.title = `${data.project.name} · Hamon`;
   $("picker").hidden = true;
   render();
   setTimeout(fit, 900);
@@ -946,7 +946,7 @@ $("backBtn").addEventListener("click", showPicker);
 $("projectName").addEventListener("change", async (e) => {
   const name = e.target.value.trim(); if (!projectId || !name) return;
   await window.tg.updateProject(projectId, { name });
-  document.title = `${name} · Ticket Graph`;
+  document.title = `${name} · Hamon`;
 });
 $("exportBtn").addEventListener("click", () => { if (projectId) window.tg.revealProject(projectId); });
 

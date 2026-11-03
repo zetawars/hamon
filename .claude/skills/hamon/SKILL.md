@@ -1,13 +1,13 @@
 ---
-name: ticket-graph
-description: Read and change the user's Ticket Graph projects (game-dev tickets such as units, buildings and disciplines like Sound or 3D Model, connected by Link tickets with a 0-10 strength). Use when the user asks to create, find, link, update or report on tickets, links, strength, notes, board columns, project progress, or "what's red/yellow/green/blue".
+name: hamon
+description: Read and change the user's Hamon projects (game-dev tickets such as units, buildings and disciplines like Sound or 3D Model, connected by Link tickets with a 0-10 strength). Use when the user asks to create, find, link, update or report on tickets, links, strength, notes, board columns, project progress, or "what's red/yellow/green/blue".
 ---
 
-# Ticket Graph
+# Hamon
 
-Ticket Graph is the tool in this repo (web app, desktop app, MCP server). Each project is a folder (outside this repo) with `project.yaml` and `tickets/*.md`: **one markdown file per ticket and per link**, with YAML front matter and markdown notes. The app's list of projects is `projects.json` in the app data folder (`%APPDATA%\Ticket Graph` on Windows).
+Hamon is the tool in this repo (web app, desktop app, MCP server). Each project is a folder (outside this repo) with `project.yaml` and `tickets/*.md`: **one markdown file per ticket and per link**, with YAML front matter and markdown notes. The app's list of projects is `projects.json` in the app data folder (`%APPDATA%\Hamon` on Windows).
 
-**Prefer the `ticket-graph` MCP tools** (`mcp__ticket-graph__*`, configured in `.mcp.json`; needs `npm install` once). They apply the rules below (keys, link titles, valid statuses, cascading deletes). If they aren't loaded, look for them with ToolSearch ("ticket-graph"). Editing the files directly also works, and an open app picks it up. If you do, keep the format exactly as described below and never change a `key`.
+**Prefer the `hamon` MCP tools** (`mcp__hamon__*`, configured in `.mcp.json`; needs `npm install` once). They apply the rules below (keys, link titles, valid statuses, cascading deletes). If they aren't loaded, look for them with ToolSearch ("hamon"). Editing the files directly also works, and an open app picks it up. If you do, keep the format exactly as described below and never change a `key`.
 
 ## Model
 

@@ -1,4 +1,4 @@
-// SQLite storage for Ticket Graph. One database file holds every project.
+// SQLite storage for Ticket Graph (the old name of Hamon). One database file holds every project.
 const Database = require("better-sqlite3");
 const crypto = require("node:crypto");
 
@@ -96,7 +96,7 @@ function open(file) {
         tickets: Object.fromEntries(tickets), links: Object.fromEntries(links), settings };
     },
     importProject(data, nameOverride) {
-      if (!data || typeof data.tickets !== "object") throw new Error("This file isn't a Ticket Graph export.");
+      if (!data || typeof data.tickets !== "object") throw new Error("This file isn't a Ticket Graph or Hamon export.");
       const id = api.createProject({ name: nameOverride || data.name || "Imported project", description: data.description || "" });
       db.transaction(() => {
         for (const [tid, body] of Object.entries(data.tickets || {})) api.put("tickets", id, tid, body);

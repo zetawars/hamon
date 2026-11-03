@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "ticket-graph": {
+    "hamon": {
       "type": "stdio",
       "command": "node",
       "args": ["mcp/server.mjs"]

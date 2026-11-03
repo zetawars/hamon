@@ -5,6 +5,7 @@
 // Used by the desktop app's main process and by the MCP server, so it has no Electron dependencies.
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 const YAML = require("yaml");
 
 const TICKETS_DIR = "tickets";
@@ -234,9 +235,24 @@ function registry(file) {
   };
 }
 
-// Project folders inside a directory (default: this repo's projects/ folder, or TG_PROJECTS), so a cloned
+// The app data folder holding projects.json (HAMON_HOME overrides it). Before the rename the app was called
+// Ticket Graph; the first run copies that folder's project list over. Project folders themselves stay where they are.
+function appHome() {
+  if (process.env.HAMON_HOME) return process.env.HAMON_HOME;
+  const base = process.env.APPDATA || path.join(os.homedir(), ".config");
+  const home = path.join(base, "Hamon"), old = path.join(base, "Ticket Graph");
+  if (!fs.existsSync(path.join(home, "projects.json"))) {
+    for (const f of ["projects.json", "ticket-graph.db"]) {
+      try { if (fs.existsSync(path.join(old, f))) { fs.mkdirSync(home, { recursive: true }); fs.copyFileSync(path.join(old, f), path.join(home, f)); } }
+      catch (e) { console.error(`Couldn't copy ${f} from ${old}:`, e.message); }
+    }
+  }
+  return home;
+}
+
+// Project folders inside a directory (default: this repo's projects/ folder, or HAMON_PROJECTS), so a cloned
 // repo works without any app setup.
-const REPO_PROJECTS = process.env.TG_PROJECTS || path.join(__dirname, "..", "projects");
+const REPO_PROJECTS = process.env.HAMON_PROJECTS || path.join(__dirname, "..", "projects");
 function discover(dir = REPO_PROJECTS) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory())
@@ -265,4 +281,4 @@ function summarize(dir) {
 
 const projectFolderName = (name) => name.replace(/[\\/:*?"<>|]/g, "_").trim() || "Untitled project";
 
-module.exports = { openProject, registry, summarize, parsePass, isImageRef, isUrl, isCommit, discover, knownProjects, REPO_PROJECTS, parseTicket, serializeTicket, fileNameFor, projectFolderName };
+module.exports = { appHome, openProject, registry, summarize, parsePass, isImageRef, isUrl, isCommit, discover, knownProjects, REPO_PROJECTS, parseTicket, serializeTicket, fileNameFor, projectFolderName };

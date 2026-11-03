@@ -1,12 +1,11 @@
-// Ticket Graph web server: serves the app and a JSON API over the project folders (see store.js).
+// Hamon web server: serves the app and a JSON API over the project folders (see store.js).
 // Run on its own with `npm run web`, or embedded by the Electron app (electron/main.js).
 // It only listens on localhost, and rejects requests whose Host isn't localhost (DNS-rebinding guard).
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
-const os = require("node:os");
 const { spawn } = require("node:child_process");
-const { openProject, registry, summarize, knownProjects, REPO_PROJECTS, isImageRef } = require("./store");
+const { openProject, registry, summarize, knownProjects, REPO_PROJECTS, isImageRef, appHome } = require("./store");
 const { uniqueDir } = require("./migrate");
 
 const ROOT = path.join(__dirname, "..");
@@ -20,11 +19,7 @@ const STATIC = [
   ["/", path.join(__dirname, "renderer")],
 ];
 
-function defaultHome() {
-  return process.env.TG_HOME || path.join(process.env.APPDATA || path.join(os.homedir(), ".config"), "Ticket Graph");
-}
-
-function startServer({ home = defaultHome(), projectsRoot, port = Number(process.env.PORT) || 4387, host = "127.0.0.1" } = {}) {
+function startServer({ home = appHome(), projectsRoot, port = Number(process.env.PORT) || 4387, host = "127.0.0.1" } = {}) {
   const reg = registry(path.join(home, "projects.json"));
   // Where new projects go: the user's saved choice, else the caller's default, else this repo's projects/ folder.
   const root = () => reg.root() || projectsRoot || REPO_PROJECTS;
@@ -76,7 +71,7 @@ function startServer({ home = defaultHome(), projectsRoot, port = Number(process
     },
     "POST /api/projects/add": ({ path: dir }) => {
       const p = openProject(dir);
-      if (!p.exists()) throw Object.assign(new Error("That folder isn't a Ticket Graph project (no project.yaml or tickets folder)."), { status: 400 });
+      if (!p.exists()) throw Object.assign(new Error("That folder isn't a Hamon project (no project.yaml or tickets folder)."), { status: 400 });
       reg.add(p.dir);
       return p.dir;
     },
@@ -172,6 +167,6 @@ function startServer({ home = defaultHome(), projectsRoot, port = Number(process
 module.exports = { startServer };
 
 if (require.main === module) {
-  startServer().then(({ url }) => console.log(`Ticket Graph is running at ${url}`))
+  startServer().then(({ url }) => console.log(`Hamon is running at ${url}`))
     .catch((e) => { console.error(e.code === "EADDRINUSE" ? `Port ${e.port} is in use. Set PORT to another number.` : e.message); process.exit(1); });
 }

@@ -1,20 +1,19 @@
 #!/usr/bin/env node
-// MCP server for Ticket Graph: lets Claude read and change the user's projects.
+// MCP server for Hamon: lets Claude read and change the user's projects.
 // A project is a folder of markdown ticket files (see src/store.js); this server and the desktop app share them,
-// and the open app reloads when files change. Run: node mcp/server.mjs   (TG_HOME overrides the app data folder)
+// and the open app reloads when files change. Run: node mcp/server.mjs   (HAMON_HOME overrides the app data folder)
 import { createRequire } from "node:module";
 import path from "node:path";
 import fs from "node:fs";
-import os from "node:os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
 const require = createRequire(import.meta.url);
-const { openProject, registry, summarize, knownProjects, REPO_PROJECTS, isImageRef, isUrl } = require("../src/store.js");
+const { appHome, openProject, registry, summarize, knownProjects, REPO_PROJECTS, isImageRef, isUrl } = require("../src/store.js");
 const { uniqueDir } = require("../src/migrate.js");
 
-const HOME = process.env.TG_HOME || path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "Ticket Graph");
+const HOME = appHome();
 const reg = registry(path.join(HOME, "projects.json"));
 const defaultRoot = () => reg.root() || REPO_PROJECTS;
 
@@ -99,8 +98,8 @@ const tool = (fn) => async (args) => {
 const propsSchema = z.record(z.string(), z.string().nullable());
 
 /* ---------- server ---------- */
-const server = new McpServer({ name: "ticket-graph", version: "2.0.0" }, {
-  instructions: `Ticket Graph is the user's local project tracker. Each project is a folder; every ticket is a markdown file (YAML front matter + notes) in its tickets/ folder. The desktop app reloads on its own when these change.
+const server = new McpServer({ name: "hamon", version: "2.0.0" }, {
+  instructions: `Hamon is the user's local project tracker. Each project is a folder; every ticket is a markdown file (YAML front matter + notes) in its tickets/ folder. The desktop app reloads on its own when these change.
 Ticket types: "Content" (a thing in the game, e.g. a unit or building), "Discipline" (a kind of work many things rely on, e.g. Sound, 3D Model, Mechanic) and "Link". The specific kind of Content/Discipline is the "category" property.
 A Link is itself a ticket (key LNK-n) between two tickets: it is the actual piece of work, e.g. "Tesla Trooper · 3D Model". It has a strength 0-10 (0 = no work done, 10 = all done; bands 0-3 red, 4-7 yellow, 8-9 green, 10 blue/done), properties such as status, and markdown notes.
 Each attempt at a link's work is a pass (passes/<LINK>/NNN.md): the strength it reached, the tool, who ran it, and references to what it produced (image/file paths, URLs, commit hashes; nothing is copied). Record a pass with record_pass every time you iterate on a link; it also sets the link's strength. A link with three passes in a row that didn't get stronger is "stuck".
@@ -128,11 +127,11 @@ server.registerTool("create_project", {
 }));
 
 server.registerTool("add_project_folder", {
-  title: "Add existing project folder", description: "Add an existing Ticket Graph project folder (e.g. one inside a game repo) to the app's project list.",
+  title: "Add existing project folder", description: "Add an existing Hamon project folder (e.g. one inside a game repo) to the app's project list.",
   inputSchema: { folder: z.string() },
 }, tool(({ folder }) => {
   const p = openProject(folder);
-  if (!p.exists()) throw new UserError("That folder isn't a Ticket Graph project (no project.yaml or tickets folder).");
+  if (!p.exists()) throw new UserError("That folder isn't a Hamon project (no project.yaml or tickets folder).");
   reg.add(p.dir); return { added: p.load().project.name, folder: p.dir };
 }));
 

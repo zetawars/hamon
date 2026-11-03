@@ -1,4 +1,4 @@
-// Browser client for the Ticket Graph server (src/server.js). The page only talks to window.tg.
+// Browser client for the Hamon server (src/server.js). The page only talks to window.tg.
 // In the desktop app, electron/preload.js adds window.tgNative for native folder dialogs.
 (() => {
   const clientId = crypto.randomUUID();   // lets this tab ignore change events caused by its own writes

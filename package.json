@@ -1,7 +1,7 @@
 {
-  "name": "ticket-graph",
-  "productName": "Ticket Graph",
-  "version": "1.1.0",
+  "name": "hamon",
+  "productName": "Hamon",
+  "version": "1.2.0",
   "description": "Project tracker where every ticket and every link is a markdown file. Web app first, desktop app (Electron) second, plus an MCP server for Claude.",
   "main": "electron/main.js",
   "private": true,
@@ -13,11 +13,11 @@
     "dist": "electron-builder --win nsis",
     "postinstall": "electron-builder install-app-deps || node -e \"\"",
     "docs:example": "node scripts/example-project.js",
-    "docs:screenshots": "node -e \"process.env.TG_HOME='.smoke/docs-home';process.env.TG_PROJECTS='examples';process.env.TG_THEME='light';process.env.TG_SCREENSHOTS='1';require('child_process').spawnSync(require('electron'),['.'],{stdio:'inherit'})\""
+    "docs:screenshots": "node -e \"process.env.HAMON_HOME='.smoke/docs-home';process.env.HAMON_PROJECTS='examples';process.env.HAMON_THEME='light';process.env.HAMON_SCREENSHOTS='1';require('child_process').spawnSync(require('electron'),['.'],{stdio:'inherit'})\""
   },
   "build": {
-    "appId": "local.ticketgraph",
-    "productName": "Ticket Graph",
+    "appId": "local.hamon",
+    "productName": "Hamon",
     "files": [
       "src/**/*",
       "electron/**/*",
@@ -52,7 +52,7 @@
     "node": ">=20"
   },
   "license": "MIT",
-  "repository": "github:zetawars/ticket-graph",
+  "repository": "github:zetawars/hamon",
   "keywords": [
     "project-management",
     "mcp",

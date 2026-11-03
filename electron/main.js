@@ -3,13 +3,14 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } = require("electron");
 const path = require("node:path");
 const { startServer } = require("../src/server");
+const { appHome } = require("../src/store");
 
 let server;
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1400, height: 900, minWidth: 420, minHeight: 500,
-    title: "Ticket Graph",
+    title: "Hamon",
     backgroundColor: "#eef1f4",
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
@@ -18,15 +19,15 @@ function createWindow() {
   // Links to other sites open in the user's browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
   win.webContents.on("will-navigate", (e, url) => { if (!url.startsWith(server.url)) { e.preventDefault(); shell.openExternal(url); } });
-  if (process.env.TG_SMOKE) require("../test/smoke").run(win);
-  if (process.env.TG_SCREENSHOTS) require("../scripts/screenshots").run(win);
+  if (process.env.HAMON_SMOKE) require("../test/smoke").run(win);
+  if (process.env.HAMON_SCREENSHOTS) require("../scripts/screenshots").run(win);
 }
 
 app.whenReady().then(async () => {
-  if (process.env.TG_THEME) nativeTheme.themeSource = process.env.TG_THEME;   // "light" / "dark", for screenshots
+  if (process.env.HAMON_THEME) nativeTheme.themeSource = process.env.HAMON_THEME;   // "light" / "dark", for screenshots
   server = await startServer({
-    home: process.env.TG_HOME || app.getPath("userData"),
-    projectsRoot: process.env.TG_HOME ? path.join(process.env.TG_HOME, "Projects") : path.join(app.getPath("documents"), "Ticket Graph"),
+    home: appHome(),
+    projectsRoot: process.env.HAMON_HOME ? path.join(process.env.HAMON_HOME, "Projects") : path.join(app.getPath("documents"), "Hamon"),
     port: 0,
   });
   ipcMain.handle("dialog:folder", async (e, title) => {

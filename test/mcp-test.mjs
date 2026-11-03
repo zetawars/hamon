@@ -12,7 +12,7 @@ fs.mkdirSync(home, { recursive: true });
 fs.writeFileSync(path.join(home, "projects.json"), JSON.stringify({ root: path.join(home, "Projects"), projects: [] }));
 
 const client = new Client({ name: "tg-test", version: "1.0.0" });
-await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(root, "mcp", "server.mjs")], env: { ...process.env, TG_HOME: home } }));
+await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(root, "mcp", "server.mjs")], env: { ...process.env, HAMON_HOME: home } }));
 
 let failures = 0;
 const check = (cond, what) => { if (!cond) { failures++; console.log("FAIL", what); } };

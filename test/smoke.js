@@ -1,4 +1,4 @@
-// Smoke test: TG_HOME=<test home> TG_SMOKE=<output dir> npx electron .
+// Smoke test: HAMON_HOME=<test home> HAMON_SMOKE=<output dir> npx electron .
 // Opens the first project with tickets, then saves screenshots of the picker, graph, focus mode, board,
 // a link popup and the board's link view, and checks that an outside edit to a ticket file shows up live.
 const fs = require("node:fs");
@@ -10,14 +10,14 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function shot(win, name) {
   const img = await win.webContents.capturePage();
-  fs.writeFileSync(path.join(process.env.TG_SMOKE, name + ".png"), img.toPNG());
+  fs.writeFileSync(path.join(process.env.HAMON_SMOKE, name + ".png"), img.toPNG());
 }
 
 exports.run = (win) => {
   win.webContents.on("console-message", (e) => { if (e.level === "error") console.log("renderer error:", e.message); });
   win.webContents.once("did-finish-load", async () => {
     try {
-      fs.mkdirSync(process.env.TG_SMOKE, { recursive: true });
+      fs.mkdirSync(process.env.HAMON_SMOKE, { recursive: true });
       const js = (code) => win.webContents.executeJavaScript(code);
       await wait(1000); await shot(win, "1-picker");
       const opened = await js(`(() => { const b = [...document.querySelectorAll('[data-act="open"]')].find(x => !/\\b0 tickets/.test(x.textContent)); if (b) b.click(); return !!b; })()`);

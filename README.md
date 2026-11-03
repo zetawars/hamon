@@ -1,4 +1,6 @@
-# Ticket Graph
+# Hamon
+
+*Hamon* (波紋) is the temper line on a Japanese blade, the visible mark of how the steel was hardened pass after pass. Here it's the strength of each piece of work, pass after pass. (Formerly Ticket Graph.)
 
 **A personal project tracker for AI-assisted work.** Every ticket, and every link between two tickets, is a plain markdown file. Each link has a strength from 0 to 10 that tells you how close that piece of work is to done. Every AI iteration on it is recorded as a **pass**, with the images, files and commits it produced, so you can see whether each pass made the work stronger and how many more it is likely to need.
 
@@ -10,7 +12,7 @@ Open source (MIT). Runs as a local web app or a desktop app, and comes with an *
 
 When AI does the work, the work is **arbitrary**. A generated 3D model, sound effect or script is rarely right the first time. Sometimes the first pass is shippable; sometimes the fifth pass still has the cannon fused into the shoulder. "Done / not done" doesn't capture that, and neither does a story-point estimate made before anyone saw the output.
 
-Ticket Graph tracks **how strong each piece of work is right now** instead:
+Hamon tracks **how strong each piece of work is right now** instead:
 
 - A **Link** connects a thing in your game to a kind of work, e.g. *Heavy Walker · 3D Model*. That link **is** the task.
 - Its **strength (0-10)** is your honest read of the current output: 0 means nothing usable, 10 means ship it. After each AI pass you move the slider.
@@ -43,7 +45,7 @@ Strength bands: **0-3 red** (regenerate), **4-7 yellow** (iterate), **8-9 green*
 
 ## A personal tool
 
-Ticket Graph is built for one person, or one person plus their AI agents, running their own project:
+Hamon is built for one person, or one person plus their AI agents, running their own project:
 
 - **Local first.** Your data is a folder of markdown files on your machine. There are no accounts, no server and no sync service. The web server only listens on `localhost`.
 - **Plain files.** One file per ticket and per link, so you can edit them in VS Code, grep them, and put the folder in your game's git repo. Diffs show exactly which piece of work moved.
@@ -63,7 +65,7 @@ The MCP server (`mcp/server.mjs`) gives Claude the same view of the project you 
 
 Changes made by an agent show up in the open app within half a second, because both work on the same files. The tools enforce the rules (stable keys, valid statuses, links titled after their two tickets), and anything destructive asks first.
 
-This repo includes [`CLAUDE.md`](CLAUDE.md), [`.mcp.json`](.mcp.json) and a [`ticket-graph` skill](.claude/skills/ticket-graph/SKILL.md), so a Claude Code session opened in a clone already knows how to use the tool.
+This repo includes [`CLAUDE.md`](CLAUDE.md), [`.mcp.json`](.mcp.json) and a [`hamon` skill](.claude/skills/hamon/SKILL.md), so a Claude Code session opened in a clone already knows how to use the tool.
 
 ## The board
 
@@ -166,13 +168,13 @@ In a ticket file, the fixed front-matter fields are `key`, `title`, `type`, `bet
 Requires Node 20 or newer.
 
 ```bash
-git clone https://github.com/zetawars/ticket-graph
-cd ticket-graph
+git clone https://github.com/zetawars/hamon
+cd hamon
 npm install --omit=dev      # web app + MCP server (no Electron)
 npm run web                 # http://localhost:4387
 ```
 
-The sample project shows up on the start screen when you run with `TG_PROJECTS=examples`. To open it otherwise, use **Open project folder…** and point it at `examples/ember-outpost`.
+The sample project shows up on the start screen when you run with `HAMON_PROJECTS=examples`. To open it otherwise, use **Open project folder…** and point it at `examples/ember-outpost`.
 
 Desktop app (Electron wraps the same web server and adds native folder dialogs):
 
@@ -185,7 +187,7 @@ npm run dist                # Windows installer in dist/
 Use the MCP server from any Claude Code session, not just this repo, by adding it at user scope:
 
 ```json
-"ticket-graph": { "type": "stdio", "command": "node", "args": ["/path/to/ticket-graph/mcp/server.mjs"] }
+"hamon": { "type": "stdio", "command": "node", "args": ["/path/to/hamon/mcp/server.mjs"] }
 ```
 
 ### Settings
@@ -193,8 +195,8 @@ Use the MCP server from any Claude Code session, not just this repo, by adding i
 | Variable | What it does |
 |---|---|
 | `PORT` | Web server port (default 4387) |
-| `TG_HOME` | App data folder holding `projects.json`, the list of known projects (default `%APPDATA%\Ticket Graph` or `~/.config/Ticket Graph`) |
-| `TG_PROJECTS` | A folder whose project subfolders are always listed (default `projects/` in this repo, gitignored) |
+| `HAMON_HOME` | App data folder holding `projects.json`, the list of known projects (default `%APPDATA%\Hamon` or `~/.config/Hamon`) |
+| `HAMON_PROJECTS` | A folder whose project subfolders are always listed (default `projects/` in this repo, gitignored) |
 
 ## Contributing
 
